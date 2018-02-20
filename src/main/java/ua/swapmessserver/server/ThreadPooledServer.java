@@ -10,6 +10,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import ua.messages.Message;
+import ua.swapmessserver.App;
 
 /**
  *
@@ -44,8 +46,7 @@ public class ThreadPooledServer implements Runnable {
                 }
                 throw new RuntimeException("Error accepting client connection", e);
             }
-            this.threadPool.execute(new WorkerRunnable(clientSocket,
-                    "Thread Pooled Server"));
+            this.threadPool.execute(new WorkerRunnable(clientSocket, this));
         }
         this.threadPool.shutdown();
         System.out.println("Server stopped");
@@ -72,4 +73,13 @@ public class ThreadPooledServer implements Runnable {
         }
     }
 
+    public synchronized void Handle(Message mess) {
+        if (App.listUsersConcurrentHashMapObject.containsKey(mess.getReciverCode())) {
+            WorkerRunnable wr = App.listUsersConcurrentHashMapObject.get(mess.getReciverCode());
+            if (wr != null) {
+                wr.SendMessage(mess);
+            }
+        }
+
+    }
 }

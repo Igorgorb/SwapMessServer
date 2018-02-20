@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.xml.bind.JAXBContext;
@@ -27,43 +28,56 @@ import ua.swapmessserver.UserStub;
  */
 public class WorkerRunnable implements Runnable {
 
+    private boolean isStopped = false;
     private int code = 0;
     protected Socket clientSocket = null;
-    protected String serverText = null;
+    protected ThreadPooledServer server = null;
+    protected InputStream input = null;
+    protected OutputStream output = null;
 
-    public WorkerRunnable(Socket clientSocket, String serverText) {
-        this.clientSocket = clientSocket;
-        this.serverText = serverText;
+    public WorkerRunnable(Socket clientSocket, ThreadPooledServer server) {
+        try {
+            this.clientSocket = clientSocket;
+            this.server = server;
+            this.input = clientSocket.getInputStream();
+            this.output = clientSocket.getOutputStream();
+        } catch (IOException ex) {
+            Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     @Override
     public void run() {
-        try {
-            InputStream input = clientSocket.getInputStream();
-            OutputStream output = clientSocket.getOutputStream();
-            // Читаем первое сообщение в котором пробуем авторизироватся
-            if (ReadAuthMessage(input)) {
-                WriteAuthMessage(output);
-                if (!App.listUsersConcurrentHashMapObject.containsValue(this)) {
-                    App.listUsersConcurrentHashMapObject.put(this.code, this);
-                }
+        Message mess = null;
+        // Читаем первое сообщение в котором пробуем авторизироватся
+        if (ReadAuthMessage()) {
+            SendAuthMessage();
+            if (!App.listUsersConcurrentHashMapObject.containsValue(this)) {
+                App.listUsersConcurrentHashMapObject.put(this.code, this);
             }
-
-            
-            long time = System.currentTimeMillis();
-            output.write(("HTTP/1.1 200 OK\n\nWorkerRunnable: "
-                    + this.serverText + " - "
-                    + time
-                    + "").getBytes());
-            output.close();
-            input.close();
-            System.out.println("Request processed: " + time);
-        } catch (IOException e) {
-            //report exception somewhere.
-            e.printStackTrace();
         }
+        while (!this.isStopped()) {
+            mess = this.ReadMessage();
+            if (mess != null) {
+                this.server.Handle(mess);
+                //App.listMessagesConcurrentLinkedDeque.add(mess);
+            }
+        }
+        
+//            long time = System.currentTimeMillis();
+//            output.write(("HTTP/1.1 200 OK\n\nWorkerRunnable: "
+//                    + this.serverText + " - "
+//                    + time
+//                    + "").getBytes());
+//
+//            System.out.println("Request processed: " + time);
     }
 
+    /**
+     * Check user from outer repository
+     * @param tm
+     * @return boolean
+     */
     private boolean CheckUser(TechnicMessage tm) {
         UserStub us = new UserStub();
         if (tm != null) {
@@ -73,7 +87,12 @@ public class WorkerRunnable implements Runnable {
         return false;
     }
 
-    private boolean ReadAuthMessage(InputStream input) {
+    /**
+     * Read authentification message from input stream and unmarshal to object <code>TechnicMessage</code>
+     * and check user.
+     * @return boolean
+     */
+    private boolean ReadAuthMessage() {
         JAXBContext jc = null;
         Unmarshaller u = null;
         TechnicMessage tm = null;
@@ -93,7 +112,7 @@ public class WorkerRunnable implements Runnable {
         }
         if (u != null) {
             try {
-                tm = (TechnicMessage) u.unmarshal(input);
+                tm = (TechnicMessage) u.unmarshal(this.input);
             } catch (JAXBException ex) {
                 tm = null;
                 Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
@@ -102,8 +121,12 @@ public class WorkerRunnable implements Runnable {
 
         return (tm != null && CheckUser(tm));
     }
-    
-    private Message ReadMessage(InputStream input) {
+
+    /**
+     * Read message from input stream and unmarshal to object <code>Message</code>
+     * @return 
+     */
+    private Message ReadMessage() {
         JAXBContext jc = null;
         Unmarshaller u = null;
         Message mess = null;
@@ -123,7 +146,7 @@ public class WorkerRunnable implements Runnable {
         }
         if (u != null) {
             try {
-                mess = (Message) u.unmarshal(input);
+                mess = (Message) u.unmarshal(this.input);
             } catch (JAXBException ex) {
                 mess = null;
                 Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
@@ -133,7 +156,7 @@ public class WorkerRunnable implements Runnable {
         return mess;
     }
 
-    private void WriteAuthMessage(OutputStream out) {
+    private void SendAuthMessage() {
         JAXBContext jc = null;
         Marshaller m = null;
         Ok ok = new Ok();
@@ -154,14 +177,14 @@ public class WorkerRunnable implements Runnable {
         }
         if (m != null) {
             try {
-                m.marshal(ok, out);
+                m.marshal(ok, this.output);
             } catch (JAXBException ex) {
                 Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
     }
-    
-    private void WriteMessage(OutputStream out, Message mess) {
+
+    public void SendMessage(Message mess) {
         JAXBContext jc = null;
         Marshaller m = null;
         try {
@@ -180,7 +203,7 @@ public class WorkerRunnable implements Runnable {
         }
         if (m != null) {
             try {
-                m.marshal(mess, out);
+                m.marshal(mess, this.output);
             } catch (JAXBException ex) {
                 Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -193,5 +216,43 @@ public class WorkerRunnable implements Runnable {
         } catch (InterruptedException ex) {
             Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
         }
+    }
+
+    private synchronized boolean isStopped() {
+        return this.isStopped;
+    }
+
+    public synchronized void stop() {
+        this.isStopped = true;
+//        try {
+        this.close();
+//        } catch (IOException e) {
+//            throw new RuntimeException("Error closing server", e);
+//        }
+    }
+
+    private void close() {
+        if (this.output != null) {
+            try {
+                this.output.close();
+            } catch (IOException ex) {
+                Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        if (this.input != null) {
+            try {
+                this.input.close();
+            } catch (IOException ex) {
+                Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        if (this.clientSocket != null) {
+            try {
+                this.clientSocket.close();
+            } catch (IOException ex) {
+                Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+
     }
 }

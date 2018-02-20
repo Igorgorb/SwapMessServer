@@ -7,7 +7,10 @@ package ua.swapmessserver;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import ua.messages.Message;
 import ua.swapmessserver.server.ThreadPooledServer;
+import ua.swapmessserver.server.WorkerRunnable;
 
 /**
  *
@@ -16,18 +19,18 @@ import ua.swapmessserver.server.ThreadPooledServer;
 public class App {
 
     public static int INIT_USER_COUNT = 50;
-    public static Map<Integer, Runnable> listUsersConcurrentHashMapObject = null;
+    public static Map<Integer, WorkerRunnable> listUsersConcurrentHashMapObject = null;
+    public static ConcurrentLinkedDeque<Message> listMessagesConcurrentLinkedDeque = null;
 
-    
 //    public void put(String s, int i) {
 //        listUsersConcurrentHashMapObject.put(s, i);
 //    }
-    
     /**
      * @param args the command line arguments
      */
     public static void main(String[] args) {
         listUsersConcurrentHashMapObject = new ConcurrentHashMap<>(INIT_USER_COUNT);
+        listMessagesConcurrentLinkedDeque = new ConcurrentLinkedDeque<>();
         App a = new App();
 
         ThreadPooledServer server = new ThreadPooledServer(12300);

@@ -12,11 +12,12 @@ import javax.xml.bind.annotation.XmlType;
  *
  * @author a119
  */
-@XmlType(propOrder = {"reciverName", "messageText"})
+@XmlType(propOrder = {"reciverName","reciverCode", "messageText"})
 @XmlRootElement(name = "Message")
 public class Message {
 
     String reciverName;
+    Integer reciverCode;
     String messageText;
 
     public String getReciverName() {
@@ -25,6 +26,14 @@ public class Message {
 
     public void setReciverName(String reciverName) {
         this.reciverName = reciverName;
+    }
+
+    public Integer getReciverCode() {
+        return reciverCode;
+    }
+
+    public void setReciverCode(Integer reciverCode) {
+        this.reciverCode = reciverCode;
     }
 
     public String getMessageText() {
