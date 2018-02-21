@@ -5,9 +5,12 @@
  */
 package ua.swapmessserver.server;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.StringReader;
 import java.net.Socket;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.logging.Level;
@@ -63,7 +66,7 @@ public class WorkerRunnable implements Runnable {
                 //App.listMessagesConcurrentLinkedDeque.add(mess);
             }
         }
-        
+
 //            long time = System.currentTimeMillis();
 //            output.write(("HTTP/1.1 200 OK\n\nWorkerRunnable: "
 //                    + this.serverText + " - "
@@ -75,6 +78,7 @@ public class WorkerRunnable implements Runnable {
 
     /**
      * Check user from outer repository
+     *
      * @param tm
      * @return boolean
      */
@@ -88,16 +92,18 @@ public class WorkerRunnable implements Runnable {
     }
 
     /**
-     * Read authentification message from input stream and unmarshal to object <code>TechnicMessage</code>
-     * and check user.
+     * Read authentification message from input stream and unmarshal to object
+     * <code>TechnicMessage</code> and check user.
+     *
      * @return boolean
      */
     private boolean ReadAuthMessage() {
         JAXBContext jc = null;
         Unmarshaller u = null;
         TechnicMessage tm = null;
+        System.out.println("ReadAuthMessage");
         try {
-            jc = JAXBContext.newInstance(TechnicMessage.class);
+            jc = JAXBContext.newInstance(TechnicMessage.class); //("ua.messages");
         } catch (JAXBException ex) {
             jc = null;
             Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
@@ -112,7 +118,10 @@ public class WorkerRunnable implements Runnable {
         }
         if (u != null) {
             try {
-                tm = (TechnicMessage) u.unmarshal(this.input);
+
+                String s = WorkerRunnable.getStringFromInputStream(this.input);
+                System.out.println(s);
+                tm = (TechnicMessage) u.unmarshal(new StringReader(s));
             } catch (JAXBException ex) {
                 tm = null;
                 Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
@@ -123,15 +132,18 @@ public class WorkerRunnable implements Runnable {
     }
 
     /**
-     * Read message from input stream and unmarshal to object <code>Message</code>
-     * @return 
+     * Read message from input stream and unmarshal to object
+     * <code>Message</code>
+     *
+     * @return
      */
     private Message ReadMessage() {
         JAXBContext jc = null;
         Unmarshaller u = null;
         Message mess = null;
+        System.out.println("ReadMessage");
         try {
-            jc = JAXBContext.newInstance(TechnicMessage.class);
+            jc = JAXBContext.newInstance(Message.class);
         } catch (JAXBException ex) {
             jc = null;
             Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
@@ -159,6 +171,7 @@ public class WorkerRunnable implements Runnable {
     private void SendAuthMessage() {
         JAXBContext jc = null;
         Marshaller m = null;
+        System.out.println("SendAuthMessage");
         Ok ok = new Ok();
         ok.setMess("Ok");
         try {
@@ -178,6 +191,7 @@ public class WorkerRunnable implements Runnable {
         if (m != null) {
             try {
                 m.marshal(ok, this.output);
+                this.clientSocket.shutdownOutput();
             } catch (JAXBException ex) {
                 Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -187,6 +201,7 @@ public class WorkerRunnable implements Runnable {
     public void SendMessage(Message mess) {
         JAXBContext jc = null;
         Marshaller m = null;
+        System.out.println("SendMessage");
         try {
             jc = JAXBContext.newInstance(Message.class);
         } catch (JAXBException ex) {
@@ -253,6 +268,35 @@ public class WorkerRunnable implements Runnable {
                 Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
+
+    }
+
+    private static String getStringFromInputStream(InputStream is) {
+
+        BufferedReader br = null;
+        StringBuilder sb = new StringBuilder();
+
+        String line;
+        try {
+
+            br = new BufferedReader(new InputStreamReader(is));
+            while ((line = br.readLine()) != null) {
+                sb.append(line);
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (br != null) {
+                try {
+                    br.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        return sb.toString();
 
     }
 }

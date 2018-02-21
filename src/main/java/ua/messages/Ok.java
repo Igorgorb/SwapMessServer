@@ -5,6 +5,7 @@
  */
 package ua.messages;
 
+import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 
@@ -12,8 +13,8 @@ import javax.xml.bind.annotation.XmlType;
  *
  * @author a119
  */
-@XmlType(propOrder = {"mess"})
-@XmlRootElement(name = "OK")
+//@XmlType(propOrder = {"mess"})
+@XmlRootElement//(name = "OK")
 public class Ok {
     private String mess;
 
@@ -21,6 +22,7 @@ public class Ok {
         return mess;
     }
 
+    @XmlElement
     public void setMess(String mess) {
         this.mess = mess;
     }

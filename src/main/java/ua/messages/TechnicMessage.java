@@ -5,6 +5,7 @@
  */
 package ua.messages;
 
+import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 
@@ -12,7 +13,7 @@ import javax.xml.bind.annotation.XmlType;
  *
  * @author a119
  */
-@XmlType(propOrder = {"login", "pass"})
+//@XmlType(propOrder = {"login", "pass"})
 @XmlRootElement(name = "TM")
 public class TechnicMessage {
 
@@ -23,6 +24,7 @@ public class TechnicMessage {
         return login;
     }
 
+    @XmlElement
     public void setLogin(String login) {
         this.login = login;
     }
@@ -31,6 +33,7 @@ public class TechnicMessage {
         return pass;
     }
 
+    @XmlElement
     public void setPass(String pass) {
         this.pass = pass;
     }

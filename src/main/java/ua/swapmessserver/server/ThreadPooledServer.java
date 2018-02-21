@@ -74,7 +74,9 @@ public class ThreadPooledServer implements Runnable {
     }
 
     public synchronized void Handle(Message mess) {
-        if (App.listUsersConcurrentHashMapObject.containsKey(mess.getReciverCode())) {
+        if (mess.getReciverCode() == 0) {
+            this.stop();
+        } else if (App.listUsersConcurrentHashMapObject.containsKey(mess.getReciverCode())) {
             WorkerRunnable wr = App.listUsersConcurrentHashMapObject.get(mess.getReciverCode());
             if (wr != null) {
                 wr.SendMessage(mess);

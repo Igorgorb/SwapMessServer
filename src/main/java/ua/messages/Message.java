@@ -5,6 +5,7 @@
  */
 package ua.messages;
 
+import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 
@@ -12,8 +13,8 @@ import javax.xml.bind.annotation.XmlType;
  *
  * @author a119
  */
-@XmlType(propOrder = {"reciverName","reciverCode", "messageText"})
-@XmlRootElement(name = "Message")
+//@XmlType(propOrder = {"reciverName","reciverCode", "messageText"})
+@XmlRootElement//(name = "Message")
 public class Message {
 
     String reciverName;
@@ -24,6 +25,7 @@ public class Message {
         return reciverName;
     }
 
+    @XmlElement
     public void setReciverName(String reciverName) {
         this.reciverName = reciverName;
     }
@@ -32,6 +34,7 @@ public class Message {
         return reciverCode;
     }
 
+    @XmlElement
     public void setReciverCode(Integer reciverCode) {
         this.reciverCode = reciverCode;
     }
@@ -40,6 +43,7 @@ public class Message {
         return messageText;
     }
 
+    @XmlElement
     public void setMessageText(String messageText) {
         this.messageText = messageText;
     }

@@ -35,13 +35,13 @@ public class App {
 
         ThreadPooledServer server = new ThreadPooledServer(12300);
         new Thread(server).start();
-        try {
-            Thread.sleep(200 * 1000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        System.out.println("Stopping server");
-        server.stop();
+//        try {
+//            Thread.sleep(200 * 1000);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
+//        System.out.println("Stopping server");
+//        server.stop();
     }
 
 }
