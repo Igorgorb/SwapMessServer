@@ -12,13 +12,15 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.StringReader;
 import java.net.Socket;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamConstants;
+import javax.xml.stream.XMLStreamReader;
 import ua.messages.Message;
 import ua.messages.Ok;
 import ua.messages.TechnicMessage;
@@ -38,6 +40,19 @@ public class WorkerRunnable implements Runnable {
     protected InputStream input = null;
     protected OutputStream output = null;
 
+    // JAXB данные для работы с сообщениями
+    private JAXBContext jcTM = null;
+    private Unmarshaller uTM = null;
+    private Marshaller mTM = null;
+
+    private JAXBContext jcOK = null;
+    private Unmarshaller uOK = null;
+    private Marshaller mOK = null;
+
+    private JAXBContext jcM = null;
+    private Unmarshaller uM = null;
+    private Marshaller mM = null;
+
     public WorkerRunnable(Socket clientSocket, ThreadPooledServer server) {
         try {
             this.clientSocket = clientSocket;
@@ -51,21 +66,23 @@ public class WorkerRunnable implements Runnable {
 
     @Override
     public void run() {
-        Message mess = null;
-        // Читаем первое сообщение в котором пробуем авторизироватся
-        if (ReadAuthMessage()) {
-            SendAuthMessage();
-            if (!App.listUsersConcurrentHashMapObject.containsValue(this)) {
-                App.listUsersConcurrentHashMapObject.put(this.code, this);
+        try {
+            InitJAXB();
+            Message mess = null;
+            // Читаем первое сообщение в котором пробуем авторизироватся
+            if (ReadAuthMessage()) {
+                SendAuthMessage();
+                if (!App.listUsersConcurrentHashMapObject.containsValue(this)) {
+                    App.listUsersConcurrentHashMapObject.put(this.code, this);
+                }
             }
-        }
-        while (!this.isStopped()) {
-            mess = this.ReadMessage();
-            if (mess != null) {
-                this.server.Handle(mess);
-                //App.listMessagesConcurrentLinkedDeque.add(mess);
+            while (!this.isStopped()) {
+                mess = this.ReadMessage();
+                if (mess != null) {
+                    this.server.Handle(mess);
+                    //App.listMessagesConcurrentLinkedDeque.add(mess);
+                }
             }
-        }
 
 //            long time = System.currentTimeMillis();
 //            output.write(("HTTP/1.1 200 OK\n\nWorkerRunnable: "
@@ -74,6 +91,9 @@ public class WorkerRunnable implements Runnable {
 //                    + "").getBytes());
 //
 //            System.out.println("Request processed: " + time);
+        } catch (JAXBException ex) {
+            Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     /**
@@ -98,34 +118,15 @@ public class WorkerRunnable implements Runnable {
      * @return boolean
      */
     private boolean ReadAuthMessage() {
-        JAXBContext jc = null;
-        Unmarshaller u = null;
         TechnicMessage tm = null;
         System.out.println("ReadAuthMessage");
         try {
-            jc = JAXBContext.newInstance(TechnicMessage.class); //("ua.messages");
+            String s = readFromSocket(TechnicMessage.XMLELEMENTNAME);
+            System.out.println(s);
+            tm = (TechnicMessage) this.uTM.unmarshal(new StringReader(s));
         } catch (JAXBException ex) {
-            jc = null;
+            tm = null;
             Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        if (jc != null) {
-            try {
-                u = jc.createUnmarshaller();
-            } catch (JAXBException ex) {
-                u = null;
-                Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
-        if (u != null) {
-            try {
-
-                String s = WorkerRunnable.getStringFromInputStream(this.input);
-                System.out.println(s);
-                tm = (TechnicMessage) u.unmarshal(new StringReader(s));
-            } catch (JAXBException ex) {
-                tm = null;
-                Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
-            }
         }
 
         return (tm != null && CheckUser(tm));
@@ -138,98 +139,48 @@ public class WorkerRunnable implements Runnable {
      * @return
      */
     private Message ReadMessage() {
-        JAXBContext jc = null;
-        Unmarshaller u = null;
         Message mess = null;
-        System.out.println("ReadMessage");
+        String s = readFromSocket(Message.XMLELEMENTNAME);
         try {
-            jc = JAXBContext.newInstance(Message.class);
-        } catch (JAXBException ex) {
-            jc = null;
-            Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        if (jc != null) {
-            try {
-                u = jc.createUnmarshaller();
-            } catch (JAXBException ex) {
-                u = null;
-                Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
-        if (u != null) {
-            try {
-                mess = (Message) u.unmarshal(this.input);
-            } catch (JAXBException ex) {
-                mess = null;
-                Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
+            mess = (Message) this.uM.unmarshal(new StringReader(s));
 
+        } catch (JAXBException ex) {
+            Logger.getLogger(WorkerRunnable.class
+                    .getName()).log(Level.SEVERE, null, ex);
+        }
         return mess;
     }
 
     private void SendAuthMessage() {
-        JAXBContext jc = null;
-        Marshaller m = null;
         System.out.println("SendAuthMessage");
         Ok ok = new Ok();
         ok.setMess("Ok");
         try {
-            jc = JAXBContext.newInstance(Ok.class);
+            this.mOK.marshal(ok, this.output);
         } catch (JAXBException ex) {
-            jc = null;
-            Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        if (jc != null) {
-            try {
-                m = jc.createMarshaller();
-            } catch (JAXBException ex) {
-                m = null;
-                Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
-        if (m != null) {
-            try {
-                m.marshal(ok, this.output);
-                this.clientSocket.shutdownOutput();
-            } catch (JAXBException ex) {
-                Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
-            }
+            Logger.getLogger(WorkerRunnable.class
+                    .getName()).log(Level.SEVERE, null, ex);
         }
     }
 
     public void SendMessage(Message mess) {
-        JAXBContext jc = null;
-        Marshaller m = null;
         System.out.println("SendMessage");
+
         try {
-            jc = JAXBContext.newInstance(Message.class);
+            this.mM.marshal(mess, this.output);
         } catch (JAXBException ex) {
-            jc = null;
-            Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        if (jc != null) {
-            try {
-                m = jc.createMarshaller();
-            } catch (JAXBException ex) {
-                m = null;
-                Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
-        if (m != null) {
-            try {
-                m.marshal(mess, this.output);
-            } catch (JAXBException ex) {
-                Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
-            }
+            Logger.getLogger(WorkerRunnable.class
+                    .getName()).log(Level.SEVERE, null, ex);
         }
     }
 
     private void Suspend(int millisec) {
         try {
             Thread.sleep(millisec);
+
         } catch (InterruptedException ex) {
-            Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(WorkerRunnable.class
+                    .getName()).log(Level.SEVERE, null, ex);
         }
     }
 
@@ -250,22 +201,28 @@ public class WorkerRunnable implements Runnable {
         if (this.output != null) {
             try {
                 this.output.close();
+
             } catch (IOException ex) {
-                Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(WorkerRunnable.class
+                        .getName()).log(Level.SEVERE, null, ex);
             }
         }
         if (this.input != null) {
             try {
                 this.input.close();
+
             } catch (IOException ex) {
-                Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(WorkerRunnable.class
+                        .getName()).log(Level.SEVERE, null, ex);
             }
         }
         if (this.clientSocket != null) {
             try {
                 this.clientSocket.close();
+
             } catch (IOException ex) {
-                Logger.getLogger(WorkerRunnable.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(WorkerRunnable.class
+                        .getName()).log(Level.SEVERE, null, ex);
             }
         }
 
@@ -298,5 +255,80 @@ public class WorkerRunnable implements Runnable {
 
         return sb.toString();
 
+    }
+
+    /**
+     * Init JAXB context for all messages
+     *
+     * @throws JAXBException
+     */
+    private void InitJAXB() throws JAXBException {
+        System.out.println("InitJAXB");
+
+        this.jcTM = JAXBContext.newInstance(TechnicMessage.class);
+        this.uTM = this.jcTM.createUnmarshaller();
+        this.mTM = this.jcTM.createMarshaller();
+
+        this.jcOK = JAXBContext.newInstance(Ok.class);
+        this.uOK = this.jcOK.createUnmarshaller();
+        this.mOK = this.jcOK.createMarshaller();
+
+        this.jcM = JAXBContext.newInstance(Message.class);
+        this.uM = this.jcM.createUnmarshaller();
+        this.mM = this.jcM.createMarshaller();
+    }
+
+    /**
+     * Read from socket's stream and not blocking work, when not sent
+     * EndOfStream
+     *
+     * @param expectedMessage - name expected message
+     * @return String - readed message
+     */
+    private String readFromSocket(String expectedMessage) {
+        String result = "";
+        try {
+            // prepare a stream to read the XML document
+            XMLStreamReader reader = XMLInputFactory.newInstance().createXMLStreamReader(this.input);
+
+            // prepare an unmarshaller to turn the XML into objects
+            //JAXBContext context = JAXBContext.newInstance(Test.class);
+            //Unmarshaller unmarshaller = context.createUnmarshaller();
+            //JAXBElement<Test> unmarshalledObj = unmarshaller.unmarshal(reader, Test.class);
+            //Test item = unmarshalledObj.getValue();
+            // get first event for the XML parsing
+            int readerEvent = reader.next();
+
+            // keep going until we reach the end of the document
+            while (readerEvent != XMLStreamConstants.END_DOCUMENT) {
+
+                // keep unmarshalling for every element of the expected type
+                while (readerEvent == XMLStreamConstants.START_ELEMENT && reader.getLocalName().equals(expectedMessage)) {
+//                    result = reader.getText();
+                    // The unmarshaller will have moved the pointer in the 
+                    //  stream reader - we should now be pointing at the 
+                    //  next event immediately after the unmarshalled 
+                    //  element. 
+                    // This will either the start of the next element, or 
+                    //  CHARACTERS if there is whitespace in between them, 
+                    //  or something else like a comment. 
+                    // We need to check this to decide whether we can 
+                    //  unmarshall again, or if we need to move the 
+                    //  stream reader on to get to the next element. 
+                    readerEvent = reader.getEventType();
+                }
+
+                // move the stream reader on to the next element
+                readerEvent = reader.next();
+            }
+            result = reader.getText();
+            // reached the end of the document - close the reader
+            reader.close();
+
+        } catch (Exception ex) {
+            Logger.getLogger(WorkerRunnable.class
+                    .getName()).log(Level.SEVERE, null, ex);
+        }
+        return result;
     }
 }

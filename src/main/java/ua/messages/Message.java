@@ -14,9 +14,10 @@ import javax.xml.bind.annotation.XmlType;
  * @author a119
  */
 //@XmlType(propOrder = {"reciverName","reciverCode", "messageText"})
-@XmlRootElement//(name = "Message")
+@XmlRootElement(name = Message.XMLELEMENTNAME)
 public class Message {
 
+    public static final String XMLELEMENTNAME = "message";
     String reciverName;
     Integer reciverCode;
     String messageText;

@@ -14,8 +14,10 @@ import javax.xml.bind.annotation.XmlType;
  * @author a119
  */
 //@XmlType(propOrder = {"mess"})
-@XmlRootElement//(name = "OK")
+@XmlRootElement(name = Ok.XMLELEMENTNAME)
 public class Ok {
+
+    public static final String XMLELEMENTNAME = "ok";
     private String mess;
 
     public String getMess() {
